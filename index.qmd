@@ -127,9 +127,9 @@ All the steps from the previously obtained ASV table to the alpha and beta diver
 
 -   Pablo J. Villadas <a href="https://orcid.org/0000-0001-8662-8883" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
 
--    Carmen Gómez-Lama Cabanás <a href="https://orcid.org/0000-0001-8312-9253" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
+-   Carmen Gómez-Lama Cabanás <a href="https://orcid.org/0000-0001-8312-9253" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
 
--    Antonio Valverde Corredor <a href="https://orcid.org/0000-0001-5983-2045" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
+-   Antonio Valverde Corredor <a href="https://orcid.org/0000-0001-5983-2045" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
 
 -   Manuel Fernández-López <a href="https://orcid.org/0000-0003-2366-6908" target="orcid.widget"> <img src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" alt="ORCID logo" width="16" height="16"/></a>
 
@@ -141,9 +141,11 @@ All the steps from the previously obtained ASV table to the alpha and beta diver
 
 Still building
 
-## 7.2 Repository
+### 8.2 Repository
 
-## 8. References
+The repository is available at this [website](https://anitalasa.github.io/BananaMicrobiota/ "Click to the repository") (https://anitalasa.github.io/BananaMicrobiota/)
+
+### 9. References
 
 Ihrmark, K., Bödeker, I.T.M., Cruz-Martinez, K., Friberg, H., Kubartova, A., et al., 2012. New primers to amplify the fungal ITS2 region – evaluation by 454- sequencing of artificial and natural communities. FEMS Microbiol. Ecol. 82, 666–677. https://doi.org/10.1111/j.1574-6941.2012.01437.x
 
