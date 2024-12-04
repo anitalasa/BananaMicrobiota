@@ -145,6 +145,8 @@ Still building
 
 The repository is available at this [website](https://anitalasa.github.io/BananaMicrobiota/ "Click to the repository") (https://anitalasa.github.io/BananaMicrobiota/)
 
+You can also find [here](https://anitalasabanana.netlify.app "Click to the repository") (https://anitalasabanana.netlify.app/)
+
 ### 9. References
 
 Ihrmark, K., Bödeker, I.T.M., Cruz-Martinez, K., Friberg, H., Kubartova, A., et al., 2012. New primers to amplify the fungal ITS2 region – evaluation by 454- sequencing of artificial and natural communities. FEMS Microbiol. Ecol. 82, 666–677. https://doi.org/10.1111/j.1574-6941.2012.01437.x
