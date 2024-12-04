@@ -1,0 +1,479 @@
+---
+title: "Processing of ITS2 reads obtained from Illumina MiSeq platform"
+format:
+  html:
+    toc: true
+execute:
+  eval: false
+editor_options: 
+  chunk_output_type: console
+---
+
+First of all, we will install and load of the required packages and libraries
+
+```{r}
+install.packages("devtools")
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("dada2")
+devtools::install_github("nuriamw/micro4all")
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("ShortRead")
+install.packages("tidyverse")
+
+library(devtools)
+library(dada2)
+library(micro4all)
+library(ShortRead)
+library(tidyverse)
+```
+
+As you can see, we are going to use different functions of [DADA2 package](https://benjjneb.github.io/dada2/tutorial.html "Click to DADA2 website"), so it will be nice if you read all the documentation regarding this package.
+
+::: callout-important
+The steps 1 to 7 must be performed for each sequencing run. If you are working with different sequencing runs, you have to join all the sequences tables into one object (step 8). Once the joined element is obtained, steps 9-last step have to be applied to the joined object.
+:::
+
+::: callout-warning
+If you have included a Mock community which does not include fungal sequences (or a very small number of fungal sequences) in your sequencing run, I suggest you to process first the *16S rRNA* dataset.
+:::
+
+# 1. Formatting the name of the samples
+
+Now, we will start! Set the working directory and specify the path where you will be working:
+
+```{r}
+path= "~/Platano_PLEC/PLEC_muestreo2022/310523_ITS/reads"
+list.files(path) #Check that all files are here included (script + fastq files)
+```
+
+Sort F and R reads separately and save them into two variables:
+
+```{r}
+fnFs = sort(list.files(path, pattern="_R1_001.fastq.gz", full.names = TRUE))
+fnRs = sort(list.files(path, pattern="_R2_001.fastq.gz", full.names = TRUE))
+#our filenames have the format "NGS015-23-ITS2-A2S12R_S51_L001_R2_001.fastq.gz"
+```
+
+Extract the name (code) of our samples, and remove all the extra information from the filenames:
+
+```{r}
+sample.names_raw = sapply(strsplit(basename(fnFs), "_"), `[`, 1) 
+#split the string when "_" is found and keep the 4th part of the string
+#we will get, for example, this: NGS015-23-ITS2-A2S12R
+
+sample.names= gsub(patter = "NGS015-23-ITS2-", replacement = "", sample.names)#here we replace the extra information by nothing (no characters)
+sample.names
+```
+
+::: callout-note
+Note that in this case, we have modified the sample names by employing a different way from that used for bacterial dataset. However, the result is exactly the same.
+:::
+
+# 2. Check the quality of the sequencing
+
+There are different ways to check the quality of the reads:
+
+## a) Count the number of reads
+
+It would be nice to check whether we obtained enough reads from the sequencing service. Otherwise, we should ask for the service to repeat the sequencing.
+
+```{r}
+raw_reads_count = NULL
+
+for (i in 1:length(fnFs)){
+    raw_reads_count = rbind(raw_reads_count, 
+                            length(ShortRead::readFastq(fnFs[i])))
+  } #this loop counts the number of F reads by means of the ShortRead package
+
+rownames(raw_reads_count)= sample.names #formatting of the output
+colnames(raw_reads_count)= "Number_of_reads"
+a=data.frame("_"=rownames(raw_reads_count),raw_reads_count)
+
+raw_reads_count2 = NULL
+for (i in 1:length(fnRs)){#do the same with R reads
+  raw_reads_count2 <- rbind(raw_reads_count2, 
+                            length(ShortRead::readFastq(fnRs[i])))
+} 
+rownames(raw_reads_count2)= sample.names
+colnames(raw_reads_count2)= "Number_of_reads"
+b=data.frame("_"=rownames(raw_reads_count2),raw_reads_count2)
+
+a==b #check that we get the same number of F and R reads
+
+cbind(row.names(raw_reads_count)[which.min(raw_reads_count)],
+      min(raw_reads_count))#check which sample accounts for the lowest number of reads. Be careful if you keep the negative control of the sequencing
+cbind(row.names(raw_reads_count)[which.max(raw_reads_count)],
+      max(raw_reads_count))#check which sample accounts for the highest number of reads.
+
+write.table(data.frame("_"=rownames(raw_reads_count),raw_reads_count),
+            file="Num_raw_reads_ITS.txt", sep="\t",row.names =F)
+View(raw_reads_count) #please, check the number of reads per sample
+```
+
+At this point, we have to check the number of raw reads per sample. The researcher has to verify whether this number is enough or not. It depends on the type of sample, among other parameters.
+
+## b) Inspect the length of the reads
+
+::: callout-important
+Remember that ITS2 varies in length among different fungi. We have to keep this in mind along the analysis, since we have to skip several steps that are based on the length of the reads (comparing to the processing of *16S rRNA* reads).
+:::
+
+In spite of that indicated in the above callout, we will inspect the length of the reads just to confirm the genomics service has performed a good job.
+
+In our case, the genomics service followed a 2x300 bp PE strategy.
+
+```{r}
+reads=ShortRead::readFastq(fnFs) #save the reads in a new variable with the format of ShortRead package, which is a bit different from standard R variable
+uniques = unique(reads@quality@quality@ranges@width) #get the length of the reads
+
+counts= NULL
+
+for (i in 1:length(uniques)) {
+  counts=rbind(counts,
+               length(which(reads@quality@quality@ranges@width==uniques[i])))
+  
+}#specific loop to count the number of reads of each length.  
+
+histogram =  cbind(uniques,counts)
+colnames(histogram) = c("Seq.length", "counts")
+
+#check the histogram
+head(histogram[order(histogram[,1],decreasing = TRUE),]) #Most of the sequences should fall in expected sequence length
+
+#plotting
+hist(reads@quality@quality@ranges@width, main="Forward length distribution",
+     xlab="Sequence length", ylab="Raw reads")
+
+write.table(histogram, file="Lenght_raw_reads_ITS.txt", sep="\t",row.names =F)
+```
+
+## c) Check the quality plots
+
+Check if the overlapping of F and R reads is possible considering the quality of the last nucleotides. Be careful with the quality of R reads (which tends to be worse than that of F reads, especially in the latest part of the reads).
+
+```{r}
+plotQualityProfile(fnFs[4:5])#select the specific samples you want to check, in this case 4 and 5
+plotQualityProfile(fnRs[4:5])
+```
+
+# 3. Filter and trimming step
+
+::: callout-note
+If you come from the processing of bacterial reads, you would have noticed that here we have skipped the step of FIGARO. That tool needs that all the reads are of the same length, so we cannot use it for fungal (ITS2) dataset.
+:::
+
+```{r}
+filtFs=file.path(path, "filtered", basename(fnFs))#create the "filtered" directory
+filtRs=file.path(path, "filtered", basename(fnRs))
+```
+
+Since we cannot use FIGARO, we have to test different parameters in the following filtering and trimming step. It is recommended to achieve a compromise between the percentage of retained sequences and their quality. So, run the following command indicating specific values of maxEE according to the quality plots of F and R reads previously visualized in the **step 2.c)**. Write down the results obtained for that maxEE, and then re-run with another maxEE values, until you reach to the best solution.
+
+```{r}
+out=filterAndTrim(fnFs, filtFs, fnRs, filtRs, maxN=0, maxEE=c(3,4), truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=TRUE, minLen=50)
+
+
+#maxN=0 : remove the reads with at least 1 ambiguity
+#trunQ=2: remove all the reads with one nucleotide with 2 or less quality value
+#maxEE: maximum expected error for F and R reads
+#minLen=50: remove reads shorter than 50 bp
+
+head(out)#important! Check the results
+```
+
+In our case, we selected:
+
+| Sequencing run | Positions |       | maxEE |       |
+|----------------|-----------|-------|-------|-------|
+|                | **F**     | **R** | **F** | **R** |
+| **Run5**       |           |       | 3     | 4     |
+| **Run6**       |           |       | 3     | 4     |
+| **Run7**       |           |       | 4     | 6     |
+
+::: callout-note
+If you come from the processing of bacterial reads, you would have noticed that in the above code we have not specified the trimming positions. This is not a mistake; we do not indicate the trimming position since the ITS2 region is variable in length and we will keep all the sequences regardless of their length.
+:::
+
+Our reads are partially filtered and trimmed (still have the primers!).
+
+# 4. Cutadapt: removal of the primers
+
+Our reads still have the primers (which are artificial sequences and can have ambiguities). So, we have to remove them and discard all the sequences in which primers are not found (because if the sequencing run was ok, primers should had been found inside the reads). Let's use cutadapt tool, which does not run in R but in python:
+
+```{r}
+FWD = "GTGARTCATCGAATCTTTG" #sequence of F primer
+REV = "TCCTCCGCTTATTGATATGC" #sequence of R primer
+```
+
+```{r}
+allOrients = function(primer) {
+  require(Biostrings)
+  dna =DNAString(primer)  #package Biostrings does not work with characters but with strings, so let's change the class of the primers variables.
+  orients = c(Forward = dna, Complement = Biostrings::complement(dna), 
+              Reverse = reverse(dna), RevComp = reverseComplement(dna))
+  return(sapply(orients, toString)) #change from string to character
+} #this function calculates all the possible orientations of the primers
+
+FWD.orients = allOrients(FWD) #pass the function to F and R primers
+REV.orients  = allOrients(REV)
+FWD.orients
+REV.orients
+```
+
+```{r}
+primerHits =function(primer, fn) {
+  nhits =vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits > 0))
+} #it counts the number of sequence in each orientation
+
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = filtFs[[4]]),#check for instante, in sample number 4
+      FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = filtRs[[4]]),
+      REV.ForwardReads = sapply(REV.orients, primerHits, fn = filtFs[[4]]),
+      REV.ReverseReads = sapply(REV.orients, primerHits, fn = filtRs[[4]]))
+#here we make a summary table. Please, visit DADA2 website for a better interpretation of the table.
+```
+
+Now yes, we are running cutadapt, although we have to adapt the reads previously for cutadapt. This tool need some flags that have to be added to the reads. Visit the web of [cutadapt](https://cutadapt.readthedocs.io/en/stable/guide.html "User guide of cutadapt").
+
+```{r}
+cutadapt  =  "/usr/bin/cutadapt" #path to cutadapt 
+
+system2(cutadapt, args = c("--version")) # Run shell commands from R
+
+path.cut =file.path(path, "cutadapt") #create a directory where processed reads will be saved
+
+if(!dir.exists(path.cut)) dir.create(path.cut)
+
+fnFs.cut =file.path(path.cut, basename(filtFs))#if you came from the processing of 16S rRNA reads, be careful here. We have to use "filtFs" instead of "fnFs" because we have already performed the filtering and trimming steps.
+fnRs.cut =file.path(path.cut, basename(filtRs))#the same comment here
+
+#Produce arguments for cutadapt
+FWD.RC = dada2:::rc(FWD)  
+REV.RC = dada2:::rc(REV)
+
+R1.flags  =  paste0("-a", " ", "^",FWD,"...", REV.RC) #adding the flags
+R2.flags  =  paste0("-A"," ","^", REV, "...", FWD.RC)
+
+#run cutadapt
+for(i in seq_along(fnFs)) {
+  system2(cutadapt, args = c(R1.flags, R2.flags, "-n", 2,"-m", 1, "--discard-untrimmed", "-j",0, "-o", fnFs.cut[i], "-p", fnRs.cut[i], filtFs[i], filtRs[i],"--report=minimal")) 
+}
+
+#-n 2: remove the primers
+#-m 1: remove empty sequences
+#-j 0: automatically detect number of cores
+#-0: output files
+#-i: input files. We use the filtered and trimmed reads
+```
+
+Now, we check whether cutadapt has removed all the primers. For that purpose, we pass the previously created function to check the number of times each primer appears in our dataset:
+
+```{r}
+
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFs.cut[[4]]),#Here we can indicate the number of the sample we want to check. In this case, sample number 4
+      FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = fnRs.cut[[4]]),
+      REV.ForwardReads = sapply(REV.orients, primerHits, fn = fnFs.cut[[4]]),
+      REV.ReverseReads = sapply(REV.orients, primerHits, fn = fnRs.cut[[4]]))
+```
+
+::: callout-note
+Note that in some cases, after the removal of the primers by cutadapt, the function *primerHits* still finds some primers in our dataset. Do no panic, these differences are normal because cutadapt and that DADA2 functions are based on different algorithms.
+:::
+
+# 5. DADA2: machine learning
+
+We are going to use DADA2 to denoise, infer the samples and to correct the expected errors by applying different functions of the package.
+
+```{r}
+# First, learn error rates
+errF =learnErrors(fnFs.cut, multithread=T, verbose=1)
+errR =learnErrors(fnRs.cut, multithread=T, verbose=1)
+
+# Lets plot the errors in each position
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+#these plots show the possible errors made for each possible mutation (A>C, A>G, etc). Dots should be close to the red line.
+```
+
+# 6. DADA2: Sample inference
+
+```{r}
+dadaFs = dada(fnFs.cut, err=errF, multithread=TRUE)
+dadaRs = dada(fnRs.cut, err=errR, multithread=TRUE)
+dadaFs[[4]]#check the inferred fourth sample (it's just an example). We will obtain the number of true sequence variants from the X number of unique sequences.
+
+# Set sample names
+names(dadaFs) = sample.names
+names(dadaRs) = sample.names
+```
+
+# 7. Overlap F and R sequences
+
+In this step we are going to overlap F (forward) and R (reverse) reads coming from the same sample.
+
+```{r}
+mergers=mergePairs(dadaFs, fnFs.cut, dadaRs, fnRs.cut, verbose=TRUE)
+head(mergers[[4]]) #check the output for sample number 4
+```
+
+Now, we are going to construct an amplicon sequence variant table (ASV table).
+
+Be careful, because we will get one ASV table per sequencing run. Thus, as we got 3 runs for fungal amplicons, we will get 3 different ASV tables.
+
+```{r}
+seqtab_run5= makeSequenceTable(mergers)
+dim(seqtab_run5) #indicates the number of samples (including negative controls) and the number of ASVs
+saveRDS(seqtab_run5, "~/Platano_PLEC/PLEC_muestreo2022/310523_ITS/reads/seqtab_run5.rds") #save the seqtab in .rds format
+```
+
+# 8. Merge sequence tables from different runs
+
+As indicated before, in this step we are going to merge the sequence tables ("seqtabs") coming from different runs. So, firstly, we have to load all of them to the current project. Please, note that all the seqtabs have to be in the same working directory!
+
+```{r}
+seqtab_run5=readRDS("seqtab_run5.rds")#load all the .rds files in the same directory
+seqtab_run6=readRDS("seqtab_run6rds")
+seqtab_run7=readRDS("seqtab_run7rds")
+
+
+mergedSeqTab=mergeSequenceTables(seqtab_run5,seqtab_run6,seqtab_run7,repeats="sum")
+#with "sum" we indicate that we want to join and sum all the reads that are in samples with the same name. Why do we do that? 
+```
+
+# 9. Chimeral removal
+
+As the sequencing process is based on PCRs, chimeric sequences are expect to appear. So, let's remove them.
+
+```{r}
+seqtab.nochim = removeBimeraDenovo(mergedSeqTab, method="consensus", multithread=TRUE, verbose=TRUE)#if you just are working on one dataset (coming from just one sequencing run, instead of "mergedSeqTab", you have to write "seqt_tab" or the name of your seqtab)
+dim(seqtab.nochim) #indicates the number of samples and ASVs (but not the number of sequences)
+```
+
+# 10. Other steps: flter the ASVs by their length
+
+Let's check the number of ASVs and their length:
+
+```{r}
+table(nchar(getSequences(seqtab.nochim)))  #Number of ASV of each length
+  #first line: length of the sequences
+  #second line: number of sequences of each length
+```
+
+Calculate the number of sequences of each ASV that of each corresponding length:
+
+```{r}
+reads.per.seqlen = tapply(colSums(seqtab.nochim), factor(nchar(getSequences(seqtab.nochim))), sum)
+reads.per.seqlen
+
+table_reads_seqlen = data.frame(length=as.numeric(names(reads.per.seqlen)), count=reads.per.seqlen)
+ggplot(data=table_reads_seqlen, aes(x=length, y=count)) + geom_col()
+```
+
+# 11. Taxonomic classification
+
+We are going to classify our ITS2 amplicons against [UNITE](https://doi.org/10.15156/BIO/2938067 "Click to the paper") v.9.0 database, which is host in our PC or server.
+
+```{r}
+taxa_unite =assignTaxonomy(seqtab.nochim, "/home/databases/sh_general_release_dynamic_25.07.2023.fasta", multithread=TRUE)#indicate the path were your database is located
+
+ASV = seqtab.nochim #edit the tables
+ASVt = t(ASV)
+
+taxa_na = apply(taxa_unite,2, tidyr::replace_na, "unclassified")[,-7] #replace the "NA" values by "unclassified" in those case in which an ASV have not been identified at a specific taxonomic rank
+taxa_rdp_na=taxa_rdp_na[,-(7:15)]
+
+#we are going to modify a bit the tables so that the name of ASVs looks like "ASV00001" (in case we have 10000 ASVs or more). In case we have just 100 ASVs, they will have that code: "ASV001"
+
+number.digit = nchar(as.integer(nrow(ASVt)))
+names =paste0("ASV%0", number.digit, "d") #As many 0 as digits
+ASV_names<- sprintf(names, 1:nrow(ASVt))
+
+ASV_table_classified_raw = cbind(as.data.frame(taxa_na,stringsAsFactors = FALSE),as.data.frame(ASV_names, stringsAsFactors = FALSE),as.data.frame(ASVt,stringsAsFactors = FALSE))
+
+ASV_seqs = rownames(ASV_table_classified_raw)
+rownames(ASV_table_classified_raw) <- NULL
+ASV_table_classified_raw = cbind(ASV_seqs, ASV_table_classified_raw)
+
+write.table(ASV_table_classified_raw, file="ASV_table_classified_raw_wirhMockwithPlastids.txt", sep="\t")
+```
+
+Now, we have our ASV table with the corresponding taxonomic classification. But, it still potentially includes some sequences that could be erroneous.
+
+# 12. MOCK Community: setting the sequencing detection limit
+
+The Mock Community we used in our sequencing runs just includes sequences of two fungi (yeast indeed). Thus, we will consider that the detection limit previously established for bacterial dataset is the same as for fungi. Ours was **0.001207%** of the sequences. Let's use it:
+
+```{r}
+ASV_sums=rowSums(ASV_table_classified_raw[,9:ncol(ASV_table_classified_raw)])
+sum.total=sum(ASV_sums)# Get the total number of sequences
+nseq_cutoff=(0.001207/100)*sum.total# Apply the percentage to sequence number
+
+# Now, filter the table accordingly:
+ASV_filtered=ASV_table_classified_raw[which(ASV_sums>nseq_cutoff),] #we are retaining just those ASVs accounting for more sequences that that determined by the cut-off
+ASV_table=ASV_filtered[order(ASV_filtered[["ASV_names"]]),]# Sort table in ascending order of ASV names
+```
+
+# 13. Removal of erronous sequences and taxonomy refinement
+
+Let's remove all the undesired sequences (if we are working with plant endophytes, we will have retained plant sequences, e.g., chloroplasts). We will also remove those ASVs not classified even at kingdom level.
+
+```{r}
+ASV_final=ASV_table[(which(ASV_table$Kingdom!="unclassified")),] #remove all the sequences not classified at Kingdom level
+```
+
+Sometimes, when we have worked with plant tissues, we can find some fungi that are ascribed to "*incertae sedis*" group (missclassified) even at phylum level. They tend to be sequences of the plant host. So, let's verify it and remove them in case we find these sequences:
+
+```{r}
+incertae_phy=ASV_final[which(ASV_final$Phylum=="p__Fungi_phy_Incertae_sedis"),] #UNITE database writes "p__" prior to the name of the phyla
+seq_incertae=as.list(incertae_phy$ASV_seqs)
+write.fasta(seq_incertae, names=incertae_phy$ASV_names, file.out="incertaesedis_phylum.fas", open = "w", nbchar =1000 , as.string = FALSE)#save the fasta file of these ASVs
+
+#Let's perform a comparison of these sequences against the NCBI GenBank database by BLASTn
+system(("/home/programas/ncbi-blast-2.13.0+/bin/blastn -query incertaesedis_phylum.fas -db /home/databases/nt -out incertae_phylum_hits.txt -outfmt '6 std stitle' -show_gis -max_target_seqs 20 -parse_deflines -num_threads 10"),intern = TRUE)
+
+#The output of the BLAST ("incertae_phylum_hits.txt") have to be manually checked.
+
+#In our case, all the sequences are related to *Musa* spp. and other eukaryots that are not fungi, so we are going to remove all these sequences:
+
+ASV_final2 = ASV_final[(which(ASV_final$Phylum!="p__Fungi_phy_Incertae_sedis")),]
+```
+
+Repeat the same with the unclassified sequences at phylum level:
+
+```{r}
+unclassified_phy=ASV_final2[which(ASV_final2$Phylum=="unclassified"),]
+seq_unclassified= as.list(unclassified_phy$ASV_seqs)
+write.fasta(seq_unclassified, names=unclassified_phy$ASV_names, file.out="unclassified_phylum.fas", open = "w", nbchar =1000 , as.string = FALSE)
+system(("/home/programas/ncbi-blast-2.13.0+/bin/blastn -query unclassified_phylum.fas -db /home/databases/nt -out unclassified_phylum_hits.txt -outfmt '6 std stitle' -show_gis -max_target_seqs 5 -parse_deflines -num_threads 10"),intern = TRUE)
+
+#We found a lot of missclassified ASVs at phylum, so we are going to remove them especifically:
+
+ASV_final3 = ASV_final2[(which(ASV_final2$ASV_names!="ASV0004"&
+                                ASV_final2$ASV_names!="ASV0012"&
+                                ASV_final2$ASV_names!="ASV0109"&
+                                ASV_final2$ASV_names!="ASV0140"&
+                                ASV_final2$ASV_names!="ASV0269"&
+                                ASV_final2$ASV_names!="ASV0627"&
+                                ASV_final2$ASV_names!="ASV0654"&
+                                ASV_final2$ASV_names!="ASV1112"&
+                                ASV_final2$ASV_names!="ASV0938"&
+                                  ASV_final2$ASV_names!="ASV0911"&
+                                  ASV_final2$ASV_names!="ASV0731"&
+                                  ASV_final2$ASV_names!="ASV0844"&
+                                  ASV_final2$ASV_names!="ASV0923"&
+                                  ASV_final2$ASV_names!="ASV1080"&
+                                 ASV_final2$ASV_names!="ASV1096"&
+                                 ASV_final2$ASV_names!="ASV1147"&
+                                 ASV_final2$ASV_names!="ASV1291"&
+                                 ASV_final2$ASV_names!="ASV1321"&
+                                 ASV_final2$ASV_names!="ASV1335")),]
+
+```
+
+Eventually, save the definitive ASV table:
+
+```{r}
+write.table(data.frame(" "=rownames(ASV_final3),ASV_final3),file="ASV_Hongos_FINAL.txt", sep="\t",row.names =F)
+```

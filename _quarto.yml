@@ -1,0 +1,46 @@
+project:
+  type: website
+
+website:
+  title: "Banana"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: Processing of MiSeq reads
+        menu: 
+          - href: Bacteria_reads_processing.qmd #CAMBIAR Y PONER LOS SCRIPTS DE PROCESAMIENTO DE READS
+            text: 16S rRNA reads
+          - href: Fungi_reads_processing.qmd #CAMBIAR Y PONER LOS SCRIPTS DE ANALISIS
+            text: ITS2 reads
+      - text: Ecological analyses
+        menu: 
+          - href: Bacteria_data_analysis.qmd #CAMBIAR Y PONER LOS SCRIPTS DE PROCESAMIENTO DE READS
+            text: Bacterial dataset
+          - href: Fungi_data_analysis.qmd #CAMBIAR Y PONER LOS SCRIPTS DE ANALISIS
+            text: Fungal dataset
+
+    right: 
+      - icon: github #esto busca el icono que se llama "github" en la web https://icons.getbootstrap.com/
+        aria-label: GitHub
+        href: https://github.com/anitalasa
+        
+      - text: "<img src='images/orcid.png' title='ORCID' alt='ORCID' style='height:20px;'>"
+        href: https://orcid.org/0000-0003-3783-7157
+        
+      - text: "<img src='images/internet.png' title='web research group' alt='web research group' style='height:20px;'>"
+        href: https://grupos.eez.csic.es/mae/
+        #esta web es para buscar iconos. Los descargamos en png y luego los subimos a la carpeta que se
+        #llama "images" que hemos tenido que crear previamente dentro de nuestra carpeta del proyecto
+
+format:
+  html:
+    theme: minty
+    #tema: es el estilo y coge de bootstrap. No confundir con el template
+    css: styles.css
+    toc: true
+    code-fold: false
+    code-tools: true
+
+editor: visual
+

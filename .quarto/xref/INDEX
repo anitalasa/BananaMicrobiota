@@ -1,0 +1,26 @@
+{
+  "about.qmd": {
+    "about.html": "638b69c6"
+  },
+  "index.qmd": {
+    "index.html": "eb0647c5"
+  },
+  "Bacteria.qmd": {
+    "Bacteria.html": "04078a29"
+  },
+  "Fungi.qmd": {
+    "Fungi.html": "fe62c9f3"
+  },
+  "Bacteria_data_analysis.qmd": {
+    "Bacteria_data_analysis.html": "3e8fe3cf"
+  },
+  "Bacteria_reads_processing.qmd": {
+    "Bacteria_reads_processing.html": "9d84e191"
+  },
+  "Fungi_data_analysis.qmd": {
+    "Fungi_data_analysis.html": "a9b301a5"
+  },
+  "Fungi_reads_processing.qmd": {
+    "Fungi_reads_processing.html": "59e7e994"
+  }
+}
