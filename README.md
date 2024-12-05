@@ -8,4 +8,4 @@ Here is de **DOI** of the repository:
 
 This repository contains all the scripts needed for the processing of Illumina MiSeq reads and for the ecological analyses.
 
-You can see the website of the repo at: <https://anitalasa.github.io/BananaMicrobiota/> and at https://anitalasabanana.netlify.app/
+You can see the website of the repo at: <https://anitalasa.github.io/BananaMicrobiota/>
