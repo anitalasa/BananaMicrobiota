@@ -29,7 +29,7 @@ Samples were taken in two consecutive campaigns:
 Have a look at the next table that summarizes the sampling scheme.
 
 |               |                 |                    |            |                    |            |
-|:-------------:|:---------------:|:------------------:|:----------:|:------------------:|:----------:|
+|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
 | **Year 2022** |                 |                    |            |                    |            |
 |               |                 | **Plot 1 (South)** |            | **Plot 2 (North)** |            |
 |               |                 |     **Mother**     | **Sucker** |     **Mother**     | **Sucker** |
@@ -144,8 +144,6 @@ Still building
 ### 8.2 Repository
 
 The repository is available at this [website](https://anitalasa.github.io/BananaMicrobiota/ "Click to the repository") (https://anitalasa.github.io/BananaMicrobiota/)
-
-You can also find [here](https://anitalasabanana.netlify.app "Click to the repository") (https://anitalasabanana.netlify.app/)
 
 ### 9. References
 
