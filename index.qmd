@@ -29,7 +29,7 @@ Samples were taken in two consecutive campaigns:
 Have a look at the next table that summarizes the sampling scheme.
 
 |               |                 |                    |            |                    |            |
-|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+|:-------------:|:---------------:|:------------------:|:----------:|:------------------:|:----------:|
 | **Year 2022** |                 |                    |            |                    |            |
 |               |                 | **Plot 1 (South)** |            | **Plot 2 (North)** |            |
 |               |                 |     **Mother**     | **Sucker** |     **Mother**     | **Sucker** |
